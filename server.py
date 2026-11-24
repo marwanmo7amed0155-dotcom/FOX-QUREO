@@ -776,31 +776,29 @@ def make_handler():
 
 def main():
     sys.stdout = _StdoutSink()
-    port = PORT_BASE
-    server = None
-    for attempt in range(6):
-        try:
-            server = ThreadingHTTPServer(("0.0.0.0", port + attempt), make_handler())
-            port += attempt
-            break
-        except OSError:
-            try:
-                server = ThreadingHTTPServer(("127.0.0.1", port + attempt), make_handler())
-                port += attempt
-                break
-            except OSError:
-                continue
-    if server is None:
-        _ORIG_STDOUT.write("[app] لا منفذ حر متاح — أغلق النوافذ القديمة ثم أعد المحاولة.\n")
+
+    # Render supplies its listening port through the PORT environment variable.
+    hosted = bool(os.environ.get("PORT"))
+    port = int(os.environ.get("PORT", PORT_BASE))
+
+    try:
+        server = ThreadingHTTPServer(("0.0.0.0", port), make_handler())
+    except OSError as exc:
+        _ORIG_STDOUT.write("[app] تعذر تشغيل الخادم على المنفذ %s: %s\n" % (port, exc))
         return
+
     _ORIG_STDOUT.write("[app] الخادم يعمل الآن بنجاح!\n")
-    _ORIG_STDOUT.write("[app] الرابط المحلي: http://localhost:%d\n" % port)
-    _ORIG_STDOUT.write("[app] أو: http://127.0.0.1:%d\n" % port)
-    if not os.environ.get("TOOL_NO_BROWSER"):
-        try:
-            threading.Timer(1.2, lambda: webbrowser.open("http://127.0.0.1:%d/" % port)).start()
-        except Exception:
-            pass
+    if hosted:
+        _ORIG_STDOUT.write("[app] وضع الاستضافة: المنفذ %d\n" % port)
+    else:
+        _ORIG_STDOUT.write("[app] الرابط المحلي: http://localhost:%d\n" % port)
+        _ORIG_STDOUT.write("[app] أو: http://127.0.0.1:%d\n" % port)
+        if not os.environ.get("TOOL_NO_BROWSER"):
+            try:
+                threading.Timer(1.2, lambda: webbrowser.open("http://127.0.0.1:%d/" % port)).start()
+            except Exception:
+                pass
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
